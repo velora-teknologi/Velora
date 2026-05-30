@@ -1,0 +1,24 @@
+package logger
+
+import (
+	"os"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+)
+
+func NewLogger() (*zap.SugaredLogger, error) {
+	config := zap.NewProductionConfig()
+
+	if os.Getenv("ENVIRONMENT") == "development" {
+		config = zap.NewDevelopmentConfig()
+		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	}
+
+	logger, err := config.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	return logger.Sugar(), nil
+}

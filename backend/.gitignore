@@ -1,0 +1,38 @@
+# Go
+*.o
+*.a
+*.so
+.DS_Store
+go.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
+
+# Binaries
+server
+bin/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage.out
+*.test
+
+# Build output
+dist/
+build/
