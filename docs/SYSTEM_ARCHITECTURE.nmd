@@ -1,0 +1,38 @@
+# System Architecture
+
+Frontend
+
+- Next.js
+- Tailwind
+- TypeScript
+
+API Layer
+
+- Fiber
+
+Services
+
+- Auth Service
+- User Service
+- Tenant Service
+- Workflow Service
+- Agent Service
+- Billing Service
+- Analytics Service
+- Notification Service
+
+Storage
+
+- PostgreSQL
+- Redis
+- Qdrant
+
+Messaging
+
+- NATS
+
+Observability
+
+- OpenTelemetry
+- Prometheus
+- Grafana
