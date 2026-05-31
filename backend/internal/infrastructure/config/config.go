@@ -86,14 +86,24 @@ func InitRedis(cfg *Config, logger *zap.SugaredLogger) (*redis.Client, error) {
 }
 
 func InitNATS(cfg *Config, logger *zap.SugaredLogger) (*nats.Conn, error) {
-	nc, err := nats.Connect(cfg.NATSUrl)
-	if err != nil {
-		logger.Errorf("Failed to connect to NATS: %v", err)
-		return nil, err
+	retryCount := getEnvInt("NATS_RETRY_COUNT", 6)
+	retryInterval := getEnvDuration("NATS_RETRY_INTERVAL", 2*time.Second)
+
+	var nc *nats.Conn
+	var err error
+	for attempt := 1; attempt <= retryCount; attempt++ {
+		nc, err = nats.Connect(cfg.NATSUrl)
+		if err == nil {
+			logger.Info("NATS connected successfully")
+			return nc, nil
+		}
+
+		logger.Warnf("Failed to connect to NATS (attempt %d/%d): %v", attempt, retryCount, err)
+		time.Sleep(retryInterval)
 	}
 
-	logger.Info("NATS connected successfully")
-	return nc, nil
+	logger.Errorf("Failed to connect to NATS after %d attempts: %v", retryCount, err)
+	return nil, err
 }
 
 func getEnv(key, defaultValue string) string {

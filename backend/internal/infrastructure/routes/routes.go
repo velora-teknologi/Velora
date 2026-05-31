@@ -35,6 +35,14 @@ func SetupRoutes(
 	userService := services.NewUserService(userRepo, cfg.JWTSecret, logger)
 	userHandler := handlers.NewUserHandler(userService, logger)
 
+	agentRepo := persistence.NewPostgresAgentRepository(db, logger)
+	agentService := services.NewAgentService(agentRepo, logger)
+	agentHandler := handlers.NewAgentHandler(agentService, logger)
+
+	workflowRepo := persistence.NewPostgresWorkflowRepository(db, logger)
+	workflowService := services.NewWorkflowService(workflowRepo, agentRepo, logger)
+	workflowHandler := handlers.NewWorkflowHandler(workflowService, logger)
+
 	authGroup := v1.Group("/auth")
 	authGroup.Post("/login", userHandler.LoginUser)
 
@@ -47,6 +55,20 @@ func SetupRoutes(
 	userGroup.Put(":id", userHandler.UpdateUser)
 	userGroup.Delete(":id", userHandler.DeleteUser)
 	userGroup.Get("", userHandler.ListUsers)
+
+	agentGroup := v1.Group("/agents", middleware.JWTMiddleware(cfg.JWTSecret))
+	agentGroup.Post("", agentHandler.CreateAgent)
+	agentGroup.Get("", agentHandler.ListAgents)
+	agentGroup.Get(":id", agentHandler.GetAgent)
+	agentGroup.Put(":id", agentHandler.UpdateAgent)
+	agentGroup.Delete(":id", agentHandler.DeleteAgent)
+
+	workflowGroup := v1.Group("/workflows", middleware.JWTMiddleware(cfg.JWTSecret))
+	workflowGroup.Post("", workflowHandler.CreateWorkflow)
+	workflowGroup.Get("", workflowHandler.ListWorkflows)
+	workflowGroup.Get(":id", workflowHandler.GetWorkflow)
+	workflowGroup.Put(":id", workflowHandler.UpdateWorkflow)
+	workflowGroup.Delete(":id", workflowHandler.DeleteWorkflow)
 
 	logger.Info("Routes setup complete")
 }

@@ -42,6 +42,11 @@ services:
     command: -js -sd /data
     volumes:
       - nats_data:/data
+    healthcheck:
+      test: ["CMD", "nats-server", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - velora-network
 

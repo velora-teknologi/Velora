@@ -54,6 +54,7 @@ type AgentResponse struct {
 type CreateWorkflowRequest struct {
 	Name        string      `json:"name" validate:"required"`
 	Description string      `json:"description" validate:"omitempty"`
+	AgentID     string      `json:"agent_id" validate:"required"`
 	Definition  interface{} `json:"definition" validate:"required"`
 }
 
