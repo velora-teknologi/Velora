@@ -1,0 +1,42 @@
+name: CD
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Deploy to server via SSH
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start ssh-agent and add key
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Add remote host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run deployment commands on remote
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "${DEPLOY_USER}@${DEPLOY_HOST}" <<'SSH'
+            set -e
+            echo "Deploying to ${DEPLOY_PATH} on ${DEPLOY_HOST}"
+            cd "${DEPLOY_PATH}"
+            # Ensure up-to-date code
+            git fetch --all
+            git reset --hard origin/main
+            # Pull and restart containers (requires Docker Compose on remote)
+            docker compose pull || true
+            docker compose up -d --build
+            echo "Deployment finished"
+          SSH

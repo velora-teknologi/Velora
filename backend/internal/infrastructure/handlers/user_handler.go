@@ -1,5 +1,4 @@
 package handlers
-package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
@@ -61,6 +60,37 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	user, err := h.service.GetUser(c.Context(), id)
+	if err != nil {
+		if customErr, ok := err.(*customErrors.CustomError); ok {
+			return c.Status(customErr.StatusCode).JSON(fiber.Map{
+				"error": customErr.Message,
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Internal server error",
+		})
+	}
+
+	return c.JSON(user)
+}
+
+// GetCurrentUser returns the authenticated user's profile
+func (h *UserHandler) GetCurrentUser(c *fiber.Ctx) error {
+	claims, ok := c.Locals("user").(map[string]interface{})
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid authentication claims",
+		})
+	}
+
+	userID, ok := claims["sub"].(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "missing user id in token",
+		})
+	}
+
+	user, err := h.service.GetUser(c.Context(), userID)
 	if err != nil {
 		if customErr, ok := err.(*customErrors.CustomError); ok {
 			return c.Status(customErr.StatusCode).JSON(fiber.Map{

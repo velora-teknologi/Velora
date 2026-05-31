@@ -1,10 +1,10 @@
 package services
-package services
 
 import (
 	"context"
-	"fmt"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
@@ -24,14 +24,16 @@ type UserService interface {
 }
 
 type userService struct {
-	repo   repositories.UserRepository
-	logger *zap.SugaredLogger
+	repo      repositories.UserRepository
+	logger    *zap.SugaredLogger
+	jwtSecret string
 }
 
-func NewUserService(repo repositories.UserRepository, logger *zap.SugaredLogger) UserService {
+func NewUserService(repo repositories.UserRepository, jwtSecret string, logger *zap.SugaredLogger) UserService {
 	return &userService{
-		repo:   repo,
-		logger: logger,
+		repo:      repo,
+		jwtSecret: jwtSecret,
+		logger:    logger,
 	}
 }
 
@@ -165,13 +167,32 @@ func (s *userService) LoginUser(ctx context.Context, req *dtos.LoginRequest) (*d
 		return nil, customErrors.NewUnauthorizedError("Invalid email or password")
 	}
 
-	// TODO: Generate JWT token
-	token := "jwt_token_placeholder"
+	token, err := s.generateToken(user)
+	if err != nil {
+		s.logger.Errorf("Error generating JWT token: %v", err)
+		return nil, customErrors.NewInternalError("Login failed")
+	}
 
 	return &dtos.LoginResponse{
 		Token: token,
 		User:  *userToResponse(user),
 	}, nil
+}
+
+func (s *userService) generateToken(user *models.User) (string, error) {
+	if s.jwtSecret == "" {
+		return "", customErrors.NewInternalError("JWT secret is not configured")
+	}
+
+	claims := jwt.MapClaims{
+		"sub":   user.ID,
+		"email": user.Email,
+		"role":  user.Role,
+		"exp":   time.Now().Add(24 * time.Hour).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(s.jwtSecret))
 }
 
 func userToResponse(user *models.User) *dtos.UserResponse {

@@ -6,6 +6,12 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+
+	"github.com/velora-teknologi/velora/internal/application/services"
+	"github.com/velora-teknologi/velora/internal/infrastructure/config"
+	"github.com/velora-teknologi/velora/internal/infrastructure/handlers"
+	"github.com/velora-teknologi/velora/internal/infrastructure/persistence"
+	"github.com/velora-teknologi/velora/pkg/middleware"
 )
 
 func SetupRoutes(
@@ -13,6 +19,7 @@ func SetupRoutes(
 	db *gorm.DB,
 	rdb *redis.Client,
 	nc *nats.Conn,
+	cfg *config.Config,
 	logger *zap.SugaredLogger,
 ) {
 	// Health check
@@ -22,17 +29,24 @@ func SetupRoutes(
 		})
 	})
 
-	// API v1 routes
-	_ = app.Group("/api/v1")
+	v1 := app.Group("/api/v1")
 
-	// Example: Auth routes would go here
-	// setupAuthRoutes(v1, db, logger)
+	userRepo := persistence.NewPostgresUserRepository(db, logger)
+	userService := services.NewUserService(userRepo, cfg.JWTSecret, logger)
+	userHandler := handlers.NewUserHandler(userService, logger)
 
-	// Example: User routes would go here
-	// setupUserRoutes(v1, db, logger)
+	authGroup := v1.Group("/auth")
+	authGroup.Post("/login", userHandler.LoginUser)
 
-	// Example: Agent routes would go here
-	// setupAgentRoutes(v1, db, rdb, nc, logger)
+	userPublic := v1.Group("/users")
+	userPublic.Post("", userHandler.CreateUser)
+
+	userGroup := v1.Group("/users", middleware.JWTMiddleware(cfg.JWTSecret))
+	userGroup.Get("/me", userHandler.GetCurrentUser)
+	userGroup.Get(":id", userHandler.GetUser)
+	userGroup.Put(":id", userHandler.UpdateUser)
+	userGroup.Delete(":id", userHandler.DeleteUser)
+	userGroup.Get("", userHandler.ListUsers)
 
 	logger.Info("Routes setup complete")
 }
