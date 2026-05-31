@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { getHealth, getMe, login } from './api'
+import Agents from './Agents'
+import Workflows from './Workflows'
 
 function App() {
   const [status, setStatus] = useState('loading')
@@ -8,6 +10,7 @@ function App() {
   const [token, setToken] = useState<string | null>(null)
   const [user, setUser] = useState<{ email: string; full_name: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<'home' | 'agents' | 'workflows'>('home')
 
   const isAuthenticated = useMemo(() => !!token, [token])
 
@@ -36,7 +39,7 @@ function App() {
       .catch(() => setStatus('unavailable'))
   }, [token])
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
 
@@ -84,6 +87,18 @@ function App() {
           </section>
         )}
 
+        {isAuthenticated && (
+          <nav style={{ marginTop: 12 }}>
+            <button onClick={() => setView('home')}>Home</button>
+            <button onClick={() => setView('agents')} style={{ marginLeft: 8 }}>
+              Agents
+            </button>
+            <button onClick={() => setView('workflows')} style={{ marginLeft: 8 }}>
+              Workflows
+            </button>
+          </nav>
+        )}
+
         {!isAuthenticated ? (
           <section className="feature-card">
             <h2>Sign in to Velora</h2>
@@ -112,12 +127,18 @@ function App() {
           </section>
         ) : (
           <section className="feature-card">
-            <h2>Getting started</h2>
-            <ol>
-              <li>Use the seeded credentials to sign in.</li>
-              <li>Inspect backend status and user profile.</li>
-              <li>Extend the frontend with agents and workflows.</li>
-            </ol>
+            {view === 'home' && (
+              <>
+                <h2>Getting started</h2>
+                <ol>
+                  <li>Use the seeded credentials to sign in.</li>
+                  <li>Inspect backend status and user profile.</li>
+                  <li>Extend the frontend with agents and workflows.</li>
+                </ol>
+              </>
+            )}
+            {view === 'agents' && token && <Agents token={token} />}
+            {view === 'workflows' && token && <Workflows token={token} />}
           </section>
         )}
       </main>

@@ -48,3 +48,65 @@ export async function getMe(token: string) {
 
   return response.json()
 }
+
+// Agents
+export async function listAgents(token: string, skip = 0, limit = 100) {
+  const response = await fetch(`${API_URL}/agents?skip=${skip}&limit=${limit}`, {
+    headers: authHeaders(token),
+  })
+  if (!response.ok) throw new Error('Failed to list agents')
+  return response.json()
+}
+
+export async function createAgent(token: string, payload: { name: string; description?: string; config?: any }) {
+  const response = await fetch(`${API_URL}/agents`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => null)
+    throw new Error(err?.error ?? 'Failed to create agent')
+  }
+  return response.json()
+}
+
+export async function deleteAgent(token: string, id: string) {
+  const response = await fetch(`${API_URL}/agents/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  if (!response.ok) throw new Error('Failed to delete agent')
+  return true
+}
+
+// Workflows
+export async function listWorkflows(token: string, agentId: string, skip = 0, limit = 100) {
+  const response = await fetch(`${API_URL}/workflows?agent_id=${agentId}&skip=${skip}&limit=${limit}`, {
+    headers: authHeaders(token),
+  })
+  if (!response.ok) throw new Error('Failed to list workflows')
+  return response.json()
+}
+
+export async function createWorkflow(token: string, payload: { name: string; agent_id: string; definition: any }) {
+  const response = await fetch(`${API_URL}/workflows`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => null)
+    throw new Error(err?.error ?? 'Failed to create workflow')
+  }
+  return response.json()
+}
+
+export async function deleteWorkflow(token: string, id: string) {
+  const response = await fetch(`${API_URL}/workflows/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  if (!response.ok) throw new Error('Failed to delete workflow')
+  return true
+}
