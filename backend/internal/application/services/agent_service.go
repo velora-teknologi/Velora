@@ -17,15 +17,17 @@ type AgentService interface {
 	UpdateAgent(ctx context.Context, userID, id string, req *dtos.UpdateAgentRequest) (*dtos.AgentResponse, error)
 	DeleteAgent(ctx context.Context, userID, id string) error
 	ListAgents(ctx context.Context, userID string, skip, limit int) ([]*dtos.AgentResponse, error)
+	ExecuteAgent(ctx context.Context, userID, agentID string, input interface{}) (*dtos.AgentExecutionResponse, error)
 }
 
 type agentService struct {
-	repo   repositories.AgentRepository
-	logger *zap.SugaredLogger
+	repo      repositories.AgentRepository
+	publisher Publisher
+	logger    *zap.SugaredLogger
 }
 
-func NewAgentService(repo repositories.AgentRepository, logger *zap.SugaredLogger) AgentService {
-	return &agentService{repo: repo, logger: logger}
+func NewAgentService(repo repositories.AgentRepository, publisher Publisher, logger *zap.SugaredLogger) AgentService {
+	return &agentService{repo: repo, publisher: publisher, logger: logger}
 }
 
 func (s *agentService) CreateAgent(ctx context.Context, userID string, req *dtos.CreateAgentRequest) (*dtos.AgentResponse, error) {
@@ -128,6 +130,42 @@ func (s *agentService) ListAgents(ctx context.Context, userID string, skip, limi
 		responses = append(responses, agentToResponse(agent))
 	}
 	return responses, nil
+}
+
+func (s *agentService) ExecuteAgent(ctx context.Context, userID, agentID string, input interface{}) (*dtos.AgentExecutionResponse, error) {
+	agent, err := s.repo.GetByID(ctx, agentID)
+	if err != nil {
+		s.logger.Errorf("Error retrieving agent: %v", err)
+		return nil, customErrors.NewInternalError("Failed to execute agent")
+	}
+	if agent == nil || agent.UserID != userID {
+		return nil, customErrors.NewNotFoundError("Agent")
+	}
+
+	if s.publisher == nil {
+		s.logger.Error("Publisher not configured")
+		return nil, customErrors.NewInternalError("Agent runtime unavailable")
+	}
+
+	// build event
+	event := map[string]interface{}{
+		"agent_id": agent.ID,
+		"user_id":  userID,
+		"config":   agent.Config,
+		"input":    input,
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		s.logger.Errorf("Error marshaling agent execution event: %v", err)
+		return nil, customErrors.NewInternalError("Failed to execute agent")
+	}
+
+	if err := s.publisher.Publish("agent.execute", payload); err != nil {
+		s.logger.Errorf("Error publishing agent execution event: %v", err)
+		return nil, customErrors.NewInternalError("Failed to queue agent execution")
+	}
+
+	return &dtos.AgentExecutionResponse{AgentID: agent.ID, Status: "queued", Subject: "agent.execute"}, nil
 }
 
 func agentToResponse(agent *models.Agent) *dtos.AgentResponse {

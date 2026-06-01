@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { createWorkflow, deleteWorkflow, listAgents, listWorkflows } from './api'
 
-export default function Workflows({ token }: { token: string }) {
+export default function Workflows({ token }: { token: string | null }) {
   const [agentId, setAgentId] = useState('')
   const [workflows, setWorkflows] = useState<any[]>([])
   const [name, setName] = useState('')
@@ -98,6 +99,9 @@ export default function Workflows({ token }: { token: string }) {
           {workflows.map((w) => (
             <li key={w.id} style={{ marginBottom: 8 }}>
               <strong>{w.name}</strong> — {JSON.stringify(w.definition)}
+              <Link to={`/workflows/${w.id}`} style={{ marginLeft: 8 }}>
+                View Details
+              </Link>
               <button style={{ marginLeft: 8 }} onClick={() => handleDelete(w.id)}>
                 Delete
               </button>

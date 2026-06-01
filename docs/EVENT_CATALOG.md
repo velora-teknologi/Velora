@@ -14,6 +14,19 @@ tenant.created
 
 tenant.updated
 
+tenant.member.added
+tenant.member.removed
+
+team.created
+team.updated
+team.member.added
+team.member.removed
+
+workspace.created
+workspace.updated
+workspace.member.added
+workspace.member.removed
+
 ## Workflow Events
 
 workflow.created

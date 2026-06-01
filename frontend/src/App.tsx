@@ -1,7 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { getHealth, getMe, login } from './api'
 import Agents from './Agents'
+import AgentDetail from './AgentDetail'
 import Workflows from './Workflows'
+import WorkflowBuilder from './WorkflowBuilder'
+import WorkflowDetail from './WorkflowDetail'
 
 function App() {
   const [status, setStatus] = useState('loading')
@@ -10,7 +14,6 @@ function App() {
   const [token, setToken] = useState<string | null>(null)
   const [user, setUser] = useState<{ email: string; full_name: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [view, setView] = useState<'home' | 'agents' | 'workflows'>('home')
 
   const isAuthenticated = useMemo(() => !!token, [token])
 
@@ -89,13 +92,16 @@ function App() {
 
         {isAuthenticated && (
           <nav style={{ marginTop: 12 }}>
-            <button onClick={() => setView('home')}>Home</button>
-            <button onClick={() => setView('agents')} style={{ marginLeft: 8 }}>
+            <NavLink to="/" style={{ marginRight: 8 }}>
+              Home
+            </NavLink>
+            <NavLink to="/agents" style={{ marginRight: 8 }}>
               Agents
-            </button>
-            <button onClick={() => setView('workflows')} style={{ marginLeft: 8 }}>
+            </NavLink>
+            <NavLink to="/workflows" style={{ marginRight: 8 }}>
               Workflows
-            </button>
+            </NavLink>
+            <NavLink to="/workflow-builder">Workflow Builder</NavLink>
           </nav>
         )}
 
@@ -127,18 +133,27 @@ function App() {
           </section>
         ) : (
           <section className="feature-card">
-            {view === 'home' && (
-              <>
-                <h2>Getting started</h2>
-                <ol>
-                  <li>Use the seeded credentials to sign in.</li>
-                  <li>Inspect backend status and user profile.</li>
-                  <li>Extend the frontend with agents and workflows.</li>
-                </ol>
-              </>
-            )}
-            {view === 'agents' && token && <Agents token={token} />}
-            {view === 'workflows' && token && <Workflows token={token} />}
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <>
+                    <h2>Getting started</h2>
+                    <ol>
+                      <li>Use the seeded credentials to sign in.</li>
+                      <li>Inspect backend status and user profile.</li>
+                      <li>Extend the frontend with agents and workflows.</li>
+                    </ol>
+                  </>
+                }
+              />
+              <Route path="/agents" element={<Agents token={token} />} />
+              <Route path="/agents/:id" element={<AgentDetail token={token} />} />
+              <Route path="/workflows" element={<Workflows token={token} />} />
+              <Route path="/workflow-builder" element={<WorkflowBuilder token={token} />} />
+              <Route path="/workflows/:id" element={<WorkflowDetail token={token} />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </section>
         )}
       </main>

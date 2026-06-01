@@ -107,6 +107,9 @@ func (s *userService) UpdateUser(ctx context.Context, id string, req *dtos.Updat
 	if req.Avatar != "" {
 		user.Avatar = req.Avatar
 	}
+	if req.Role != "" {
+		user.Role = req.Role
+	}
 
 	if err := s.repo.Update(ctx, user); err != nil {
 		s.logger.Errorf("Error updating user: %v", err)

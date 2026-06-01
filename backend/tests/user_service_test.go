@@ -63,6 +63,15 @@ func (m *MockUserRepository) List(ctx context.Context, skip, limit int) ([]*mode
 	}
 	return users, nil
 }
+func (m *MockUserRepository) ListByTenantID(ctx context.Context, tenantID string, skip, limit int) ([]*models.User, error) {
+	var users []*models.User
+	for _, user := range m.users {
+		if user.TenantID == tenantID {
+			users = append(users, user)
+		}
+	}
+	return users, nil
+}
 
 func TestCreateUser(t *testing.T) {
 	repo := NewMockUserRepository()

@@ -76,6 +76,19 @@ func NewMockAgentRepositoryForWorkflow() *MockAgentRepositoryForWorkflow {
 	return &MockAgentRepositoryForWorkflow{agents: make(map[string]*models.Agent)}
 }
 
+type MockPublisher struct {
+	Published bool
+	Subject   string
+	Data      []byte
+}
+
+func (m *MockPublisher) Publish(subject string, data []byte) error {
+	m.Published = true
+	m.Subject = subject
+	m.Data = data
+	return nil
+}
+
 func (m *MockAgentRepositoryForWorkflow) Create(ctx context.Context, agent *models.Agent) error {
 	if agent.ID == "" {
 		agent.ID = uuid.NewString()
@@ -129,7 +142,7 @@ func TestCreateWorkflow(t *testing.T) {
 	agentRepo := NewMockAgentRepositoryForWorkflow()
 	workflowRepo := NewMockWorkflowRepository()
 	logger := zap.NewNop().Sugar()
-	service := services.NewWorkflowService(workflowRepo, agentRepo, logger)
+	service := services.NewWorkflowService(workflowRepo, agentRepo, nil, logger)
 
 	userID := uuid.NewString()
 	agent := &models.Agent{ID: uuid.NewString(), UserID: userID, Name: "My Agent"}
@@ -154,7 +167,7 @@ func TestListWorkflows(t *testing.T) {
 	agentRepo := NewMockAgentRepositoryForWorkflow()
 	workflowRepo := NewMockWorkflowRepository()
 	logger := zap.NewNop().Sugar()
-	service := services.NewWorkflowService(workflowRepo, agentRepo, logger)
+	service := services.NewWorkflowService(workflowRepo, agentRepo, nil, logger)
 
 	userID := uuid.NewString()
 	agent := &models.Agent{ID: uuid.NewString(), UserID: userID, Name: "My Agent"}
@@ -169,5 +182,31 @@ func TestListWorkflows(t *testing.T) {
 	}
 	if len(resp) != 2 {
 		t.Fatalf("expected 2 workflows, got %d", len(resp))
+	}
+}
+
+func TestExecuteWorkflow(t *testing.T) {
+	agentRepo := NewMockAgentRepositoryForWorkflow()
+	workflowRepo := NewMockWorkflowRepository()
+	publisher := &MockPublisher{}
+	logger := zap.NewNop().Sugar()
+	service := services.NewWorkflowService(workflowRepo, agentRepo, publisher, logger)
+
+	userID := uuid.NewString()
+	agent := &models.Agent{ID: uuid.NewString(), UserID: userID, Name: "My Agent"}
+	agentRepo.Create(context.Background(), agent)
+
+	workflow := &models.Workflow{ID: uuid.NewString(), Name: "Workflow A", AgentID: agent.ID, Definition: `{"steps":["start"]}`}
+	workflowRepo.Create(context.Background(), workflow)
+
+	resp, err := service.ExecuteWorkflow(context.Background(), userID, workflow.ID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if resp.Status != "queued" {
+		t.Fatalf("expected status queued, got %s", resp.Status)
+	}
+	if !publisher.Published || publisher.Subject != "workflow.execute" {
+		t.Fatalf("expected workflow.execute publish, got %v %s", publisher.Published, publisher.Subject)
 	}
 }

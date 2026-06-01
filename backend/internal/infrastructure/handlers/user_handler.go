@@ -27,31 +27,29 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	var req dtos.CreateUserRequest
 
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return respondError(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
 	// Validate request
 	if req.Email == "" || req.Password == "" || req.FullName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing required fields",
-		})
+		return respondError(c, fiber.StatusBadRequest, "Missing required fields")
 	}
 
 	user, err := h.service.CreateUser(c.Context(), &req)
 	if err != nil {
 		if customErr, ok := err.(*customErrors.CustomError); ok {
-			return c.Status(customErr.StatusCode).JSON(fiber.Map{
-				"error": customErr.Message,
-			})
+			return respondCustomError(c, customErr)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
+		return respondError(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(user)
+	return respondSuccess(c, fiber.StatusCreated, user)
+}
+
+// RegisterUser registers a new user
+// POST /api/v1/auth/register
+func (h *UserHandler) RegisterUser(c *fiber.Ctx) error {
+	return h.CreateUser(c)
 }
 
 // GetUser gets a user by ID
@@ -59,50 +57,42 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 
+	if ok, err := canManageUser(c, id); !ok {
+		return respondCustomError(c, err)
+	}
+
 	user, err := h.service.GetUser(c.Context(), id)
 	if err != nil {
 		if customErr, ok := err.(*customErrors.CustomError); ok {
-			return c.Status(customErr.StatusCode).JSON(fiber.Map{
-				"error": customErr.Message,
-			})
+			return respondCustomError(c, customErr)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
+		return respondError(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
-	return c.JSON(user)
+	return respondSuccess(c, fiber.StatusOK, user)
 }
 
 // GetCurrentUser returns the authenticated user's profile
 func (h *UserHandler) GetCurrentUser(c *fiber.Ctx) error {
 	claims, ok := c.Locals("user").(map[string]interface{})
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid authentication claims",
-		})
+		return respondError(c, fiber.StatusUnauthorized, "invalid authentication claims")
 	}
 
 	userID, ok := claims["sub"].(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "missing user id in token",
-		})
+		return respondError(c, fiber.StatusUnauthorized, "missing user id in token")
 	}
 
 	user, err := h.service.GetUser(c.Context(), userID)
 	if err != nil {
 		if customErr, ok := err.(*customErrors.CustomError); ok {
-			return c.Status(customErr.StatusCode).JSON(fiber.Map{
-				"error": customErr.Message,
-			})
+			return respondCustomError(c, customErr)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
+		return respondError(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
-	return c.JSON(user)
+	return respondSuccess(c, fiber.StatusOK, user)
 }
 
 // UpdateUser updates a user
@@ -112,24 +102,26 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 	var req dtos.UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return respondError(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	if req.Role != "" && !isAdmin(c) {
+		return respondCustomError(c, customErrors.NewForbiddenError("insufficient permissions"))
+	}
+
+	if ok, err := canManageUser(c, id); !ok {
+		return respondCustomError(c, err)
 	}
 
 	user, err := h.service.UpdateUser(c.Context(), id, &req)
 	if err != nil {
 		if customErr, ok := err.(*customErrors.CustomError); ok {
-			return c.Status(customErr.StatusCode).JSON(fiber.Map{
-				"error": customErr.Message,
-			})
+			return respondCustomError(c, customErr)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
+		return respondError(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
-	return c.JSON(user)
+	return respondSuccess(c, fiber.StatusOK, user)
 }
 
 // DeleteUser deletes a user
@@ -137,16 +129,16 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 
+	if ok, err := canManageUser(c, id); !ok {
+		return respondCustomError(c, err)
+	}
+
 	err := h.service.DeleteUser(c.Context(), id)
 	if err != nil {
 		if customErr, ok := err.(*customErrors.CustomError); ok {
-			return c.Status(customErr.StatusCode).JSON(fiber.Map{
-				"error": customErr.Message,
-			})
+			return respondCustomError(c, customErr)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
+		return respondError(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
@@ -155,6 +147,10 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 // ListUsers lists all users
 // GET /api/v1/users
 func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
+	if !isAdmin(c) {
+		return respondCustomError(c, customErrors.NewForbiddenError("insufficient permissions"))
+	}
+
 	skip := c.QueryInt("skip", 0)
 	limit := c.QueryInt("limit", 10)
 
@@ -169,18 +165,12 @@ func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
 	users, err := h.service.ListUsers(c.Context(), skip, limit)
 	if err != nil {
 		if customErr, ok := err.(*customErrors.CustomError); ok {
-			return c.Status(customErr.StatusCode).JSON(fiber.Map{
-				"error": customErr.Message,
-			})
+			return respondCustomError(c, customErr)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
+		return respondError(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
-	return c.JSON(fiber.Map{
-		"data": users,
-	})
+	return respondSuccess(c, fiber.StatusOK, users)
 }
 
 // LoginUser authenticates a user
@@ -189,29 +179,21 @@ func (h *UserHandler) LoginUser(c *fiber.Ctx) error {
 	var req dtos.LoginRequest
 
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return respondError(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
 	// Validate request
 	if req.Email == "" || req.Password == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing required fields",
-		})
+		return respondError(c, fiber.StatusBadRequest, "Missing required fields")
 	}
 
 	resp, err := h.service.LoginUser(c.Context(), &req)
 	if err != nil {
 		if customErr, ok := err.(*customErrors.CustomError); ok {
-			return c.Status(customErr.StatusCode).JSON(fiber.Map{
-				"error": customErr.Message,
-			})
+			return respondCustomError(c, customErr)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Internal server error",
-		})
+		return respondError(c, fiber.StatusInternalServerError, "Internal server error")
 	}
 
-	return c.JSON(resp)
+	return respondSuccess(c, fiber.StatusOK, resp)
 }

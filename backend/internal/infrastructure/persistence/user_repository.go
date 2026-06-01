@@ -78,3 +78,16 @@ func (r *PostgresUserRepository) List(ctx context.Context, skip, limit int) ([]*
 	}
 	return users, nil
 }
+
+func (r *PostgresUserRepository) ListByTenantID(ctx context.Context, tenantID string, skip, limit int) ([]*models.User, error) {
+	var users []*models.User
+	if err := r.db.WithContext(ctx).
+		Where("tenant_id = ?", tenantID).
+		Offset(skip).
+		Limit(limit).
+		Find(&users).Error; err != nil {
+		r.logger.Errorf("Failed to list users by tenant id: %v", err)
+		return nil, err
+	}
+	return users, nil
+}

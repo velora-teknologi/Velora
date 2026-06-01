@@ -71,7 +71,7 @@ func (m *MockAgentRepository) List(ctx context.Context, userID string, skip, lim
 func TestCreateAgent(t *testing.T) {
 	repo := NewMockAgentRepository()
 	logger := zap.NewNop().Sugar()
-	service := services.NewAgentService(repo, logger)
+	service := services.NewAgentService(repo, nil, logger)
 
 	userID := uuid.NewString()
 	req := &dtos.CreateAgentRequest{
@@ -95,7 +95,7 @@ func TestCreateAgent(t *testing.T) {
 func TestListAgents(t *testing.T) {
 	repo := NewMockAgentRepository()
 	logger := zap.NewNop().Sugar()
-	service := services.NewAgentService(repo, logger)
+	service := services.NewAgentService(repo, nil, logger)
 
 	userID := uuid.NewString()
 	repo.Create(context.Background(), &models.Agent{ID: uuid.NewString(), Name: "Agent A", UserID: userID})

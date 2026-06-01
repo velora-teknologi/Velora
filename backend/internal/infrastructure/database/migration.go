@@ -23,6 +23,11 @@ func Migrate(db *gorm.DB, logger *zap.SugaredLogger) error {
 		&models.User{},
 		&models.Agent{},
 		&models.Workflow{},
+		&models.Tenant{},
+		&models.Workspace{},
+		&models.Team{},
+		&models.Invitation{},
+		&models.APIKey{},
 	); err != nil {
 		logger.Errorf("Migration failed: %v", err)
 		return fmt.Errorf("migration error: %w", err)
@@ -40,6 +45,11 @@ func DropAllTables(db *gorm.DB, logger *zap.SugaredLogger) error {
 		&models.User{},
 		&models.Agent{},
 		&models.Workflow{},
+		&models.Tenant{},
+		&models.Workspace{},
+		&models.Team{},
+		&models.Invitation{},
+		&models.APIKey{},
 	)
 }
 
@@ -72,6 +82,23 @@ func CreateIndexes(db *gorm.DB, logger *zap.SugaredLogger) error {
 
 	if err := db.Migrator().CreateIndex(&models.Workflow{}, "is_active"); err != nil {
 		logger.Warnf("Failed to create workflow is_active index: %v", err)
+	}
+
+	// Tenant indexes
+	if err := db.Migrator().CreateIndex(&models.Tenant{}, "owner_id"); err != nil {
+		logger.Warnf("Failed to create tenant owner_id index: %v", err)
+	}
+
+	if err := db.Migrator().CreateIndex(&models.Tenant{}, "is_active"); err != nil {
+		logger.Warnf("Failed to create tenant is_active index: %v", err)
+	}
+
+	if err := db.Migrator().CreateIndex(&models.Team{}, "tenant_id"); err != nil {
+		logger.Warnf("Failed to create team tenant_id index: %v", err)
+	}
+
+	if err := db.Migrator().CreateIndex(&models.Team{}, "is_active"); err != nil {
+		logger.Warnf("Failed to create team is_active index: %v", err)
 	}
 
 	logger.Info("Database indexes created successfully")
